@@ -39,7 +39,7 @@ var Home = (function (_React$Component) {
 			return _react2['default'].createElement(
 				'div',
 				{ style: { textAlign: 'center', fontFamily: 'Helvetica, Arial' } },
-				'My sweet home Page! LA!HULISTkKKdddskkjlhjhoodd'
+				'My sweet home Page! LA!HULISTkKKdddskkjlhjhooddd'
 			);
 		}
 	}]);
