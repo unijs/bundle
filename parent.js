@@ -3,6 +3,7 @@ var fs = require('fs');
 var os = require('os');
 var fs = require('fs-extra');
 var path = require('path');
+var colors = require('colors');
 var gernerate = require('./packageGenerator.js');
 
 var sources = {};
@@ -147,7 +148,7 @@ var checkDependencies = function(dep) {
 
 
 		if (globalOptions.changed === false) {
-			console.log('NOTHING CHANGED!');
+			console.log('Nothing changed!');
 		}
 
 		var c = 0;
@@ -164,7 +165,9 @@ var checkDependencies = function(dep) {
 		var checkFin = function(a) {
 			if (a < 1) {
 				var stop = getHrTime();
-				console.log('Totally Finished! Time: ', ac - start, stop - start);
+				console.log('Bundled successful!'.green.bold);
+				console.log(' > Time until loaded:', ac - start, 'ms');
+				console.log(' > Total time:', stop - start, 'ms');
 			}
 		}
 
@@ -235,7 +238,7 @@ var setListener = function(i, worker) {
 			worker.maxJobs = worker.jobs;
 		}
 
-		dep.chTime = getHrTime();
+		//dep.chTime = getHrTime();
 		//console.log(dep);
 		worker.send({
 			job: 'loadDependency',
