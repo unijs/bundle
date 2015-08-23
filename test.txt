@@ -1,0 +1,23 @@
+Begin of File
+// MAIN
+require('split!./first.js');
+require('split!./second.js');
+require('split!./third.js');
+require('./lib.js');
+
+// FIRST
+require('./lib.js');
+require('./anotherLib.js');
+
+// SECOND
+require('./lib.js');
+require('./anotherLib.js');
+require('./theBestLib.js');
+
+// THIRD
+require('./theBestLib.js');
+
+// LIB
+//Another Lib
+// The Best Lib
+End of File
