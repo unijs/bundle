@@ -34,9 +34,9 @@ var getDependency = function(dep, file) {
 						beforeSplitted.pop();
 						basePath = '/';
 					} else {
-						return {
-							error: new Error('Failed to resolve module ' + name)
-						}
+						var e new Error('Failed to resolve module ' + name);
+						console.log("Error when analysing '" + dep.id + "'");
+						throw e;
 					}
 				}
 			}

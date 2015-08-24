@@ -12,7 +12,6 @@ process.on('message', function(m) {
 	if (m.job === 'loadDependency') {
 		//console.log('LOOOO', getHrTime() - m.dep.chTime)
 		loader(m.dep, transformers, function(err, dep) {
-			console.log(err);
 			process.send({
 				job: 'retDependency',
 				dep: dep
