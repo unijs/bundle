@@ -53,7 +53,7 @@ var getDependency = function(dep, file) {
 	//entryFile(id, tags, node_module, deep, started);
 }
 
-var getDependenciesAndSource = function(dep, transformers, done, nodeExportCallback) {
+var getDependenciesAndSource = function(dep, transformers, done) {
 	var transformers = transformers || [];
 
 	fs.readFile(dep.id, {
@@ -75,7 +75,7 @@ var getDependenciesAndSource = function(dep, transformers, done, nodeExportCallb
 				}
 			}
 		}
-		
+
 		try {
 			dep.requires = detective(dep.src);
 		} catch (e) {
@@ -87,7 +87,7 @@ var getDependenciesAndSource = function(dep, transformers, done, nodeExportCallb
 		for (var i in dep.requires) {
 			var temp_dep = getDependency(dep, dep.requires[i]);
 			if (temp_dep.error != null) {
-				return done(temp_dep.error);
+				throw temp_dep.error;
 			}
 			dep.deps.push(temp_dep);
 		}
