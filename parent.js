@@ -136,7 +136,7 @@ var checkDependencies = function(dep) {
 			}
 			sources[deps[i].id].use.client = sources[deps[i].id].use.client || deps[i].use.client;
 			sources[deps[i].id].use.node = sources[deps[i].id].use.node || deps[i].use.node;
-			
+
 			deps[i] = {
 				id: deps[i].id,
 				tags: JSON.parse(JSON.stringify(deps[i].tags)),
@@ -389,6 +389,10 @@ var run = function(options) {
 		packages: {
 			0: true
 		},
+		use: {
+			client: true,
+			node: true
+		}
 		swap: false
 	});
 }
