@@ -112,7 +112,7 @@ var generate = function(srcs, pkgCount, options, callback) {
 			swapMap[dep.key] = dep.swap;
 		}
 
-		if (!dep.node_module) {
+		if (!dep.node_module && dep.use.node === true) {
 			c++;
 			nodeExport(buildpathNode, dep.id, dep.src, function(err) {
 				if (err) {
@@ -124,17 +124,18 @@ var generate = function(srcs, pkgCount, options, callback) {
 				}
 			});
 		}
-
-		if (dep.packages[0] === true) {
-			var pkg = getPackage('0');
-			writeDependencyToStream(pkg, dep);
-		} else {
-			var pkgId = packagesHash(packageCounter, dep.packages);
-			var pkg = getPackage(pkgId, dep.packages);
-			writeDependencyToStream(pkg, dep);
-		}
-		if (sources[i].inPack > 0) {
-			sourceMap[sources[i].key] = sources[i].inPack;
+		if (dep.use.client === true) {
+			if (dep.packages[0] === true) {
+				var pkg = getPackage('0');
+				writeDependencyToStream(pkg, dep);
+			} else {
+				var pkgId = packagesHash(packageCounter, dep.packages);
+				var pkg = getPackage(pkgId, dep.packages);
+				writeDependencyToStream(pkg, dep);
+			}
+			if (sources[i].inPack > 0) {
+				sourceMap[sources[i].key] = sources[i].inPack;
+			}
 		}
 	}
 

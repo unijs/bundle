@@ -179,7 +179,7 @@ var getDependenciesAndSource = function(dep, transformers, done) {
 
 		for (var i in reqs) {
 			var req = reqs[i];
-			if(dep.browser != null && dep.use.client === true && dep.browser[req] === true){
+			if (dep.browser != null && dep.use.client === true && dep.browser[req] != null) {
 				req = dep.browser[req];
 			}
 			var temp_deps = getDependency(dep, req);
