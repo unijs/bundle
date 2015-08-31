@@ -392,7 +392,7 @@ var run = function(options) {
 		use: {
 			client: true,
 			node: true
-		}
+		},
 		swap: false
 	});
 }
