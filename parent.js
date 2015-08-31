@@ -114,7 +114,9 @@ var checkDependencies = function(dep) {
 				node_module: deps[i].node_module,
 				package: deps[i].package,
 				packages: JSON.parse(JSON.stringify(deps[i].packages)),
-				swap: deps[i].swap
+				swap: deps[i].swap,
+				use: deps[i].use,
+				browser: deps[i].browser
 			};
 		} else {
 			sources[deps[i].id].packages[deps[i].package] = true;
@@ -132,13 +134,18 @@ var checkDependencies = function(dep) {
 					}
 				}
 			}
+			sources[deps[i].id].use.client = sources[deps[i].id].use.client || deps[i].use.client;
+			sources[deps[i].id].use.node = sources[deps[i].id].use.node || deps[i].use.node;
+			
 			deps[i] = {
 				id: deps[i].id,
 				tags: JSON.parse(JSON.stringify(deps[i].tags)),
 				node_module: deps[i].node_module,
 				package: deps[i].package,
 				packages: JSON.parse(JSON.stringify(deps[i].packages)),
-				swap: deps[i].swap
+				swap: deps[i].swap,
+				use: deps[i].use,
+				browser: deps[i].browser
 			};
 		}
 	}
