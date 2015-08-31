@@ -32,5 +32,5 @@
 	"url": true,
 	"util": true,
 	"vm": true,
-	"zlib.js": true
+	"zlib": true
 }
