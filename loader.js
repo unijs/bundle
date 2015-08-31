@@ -70,8 +70,8 @@ var checkPackage = function(id, dep) {
 			return [{
 				id: resolve(path.resolve(id, pack.main)),
 				use: {
-					client: true,
-					node: true
+					client: dep.use.client,
+					node: dep.use.client
 				}
 			}];
 		}
@@ -79,8 +79,8 @@ var checkPackage = function(id, dep) {
 		return [{
 			id: resolve(id),
 			use: {
-				client: true,
-				node: true
+				client: dep.use.client,
+				node: dep.use.client
 			}
 		}];
 	}
@@ -95,9 +95,6 @@ var getDependency = function(dep, file) {
 	var before = beforeSplitted.join('/');
 	var id = name,
 		deps = [];
-	if(core[name] === true){
-		return [];
-	}
 	if (name[0] === '/' || (name[0] === '.' && (name[1] === '/' || (name[1] === '.' && name[2] === '/')))) {
 		deps = checkPackage(path.resolve(before, id), dep, before);
 	} else {
@@ -118,6 +115,9 @@ var getDependency = function(dep, file) {
 						beforeSplitted.pop();
 						basePath = '/';
 					} else {
+						if (core[name] === true) {
+							return [];
+						}
 						var e = new Error('Failed to resolve module ' + name);
 						console.log("Error when analysing '" + dep.id + "'");
 						throw e;
