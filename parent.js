@@ -9,6 +9,7 @@ var gernerate = require('./packageGenerator.js');
 var sources = {};
 var replSources = {};
 var swappersToLoad = [];
+var dirname = process.cwd();
 
 var cache = {};
 
@@ -348,7 +349,7 @@ var run = function(options) {
 	if (options == null || typeof options !== 'object' || options.entryFile == null || typeof options.entryFile !== 'string') {
 		throw new Error('Options parameter needs to be an object and include the property entryFile!');
 	}
-	options.buildpath = options.buildpath ||  path.join(__dirname, 'build');
+	options.buildpath = options.buildpath ||  path.join(dirname, 'build');
 
 	options.buildpathWeb = path.join(options.buildpath, 'web');
 	options.buildpathNode = path.join(options.buildpath, 'node');
