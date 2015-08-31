@@ -2257,6 +2257,10 @@ var _react = require('react');
 
 var _react2 = _interopRequireDefault(_react);
 
+var _http = require('http');
+
+var _http2 = _interopRequireDefault(_http);
+
 var Home = (function (_React$Component) {
 	_inherits(Home, _React$Component);
 
