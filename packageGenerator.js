@@ -8,6 +8,7 @@ var sources = {};
 var buildpath;
 var buildpathWeb;
 var buildpathNode;
+var dirname = process.cwd();
 
 var writeDependencyToStream = function(pkg, dep) {
 	sources[dep.id].inPack = pkg.id;
