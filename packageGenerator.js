@@ -160,7 +160,7 @@ var generate = function(srcs, pkgCount, options, callback) {
 		if (pkg.id > 0) {
 			pkg.stream.write('deps.o(' + pkg.id + ');');
 		} else {
-			pkg.stream.write(fs.readFileSync('client.js'));
+			pkg.stream.write(fs.readFileSync(__dirname+'/client.js'));
 		}
 		pkg.stream.end();
 	}
