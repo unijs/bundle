@@ -21,8 +21,10 @@ var writeDependencyToStream = function(pkg, dep) {
 	pkg.stream.write('\n');
 	var r = {};
 	for (var i in dep.requires) {
-		r[dep.requires[i]] = sources[dep.deps[i].id].key;
-		packages[pkg.key].reqs[sources[dep.deps[i].id].key] = true;
+		if (sources[dep.deps[i].id].use.client === true) {
+			r[dep.requires[i]] = sources[dep.deps[i].id].key;
+			packages[pkg.key].reqs[sources[dep.deps[i].id].key] = true;
+		}
 	}
 	packages[pkg.key].deps[dep.key] = true;
 	pkg.stream.write('}, ' + JSON.stringify(r) + '];\n');
@@ -59,7 +61,7 @@ var createPackage = function(key, id) {
 	packages[key].replacers = {};
 	packages[key].stream = fs.createOutputStream(path.join(buildpathWeb, 'c' + packages[key].id + '.js'));
 	if (id === 0) {
-		packages[key].stream.write('var deps = {}, process = {env: {}};\n');
+		packages[key].stream.write('var deps = {}, process = {env: {}}, global = {};\n');
 	}
 }
 
@@ -108,6 +110,8 @@ var generate = function(srcs, pkgCount, options, callback) {
 	var c = 0;
 	for (var i in sources) {
 		var dep = sources[i];
+
+		console.log(dep.use, dep.id);
 
 		if (dep.swap !== false) {
 			swapMap[dep.key] = dep.swap;
@@ -161,7 +165,7 @@ var generate = function(srcs, pkgCount, options, callback) {
 		if (pkg.id > 0) {
 			pkg.stream.write('deps.o(' + pkg.id + ');');
 		} else {
-			pkg.stream.write(fs.readFileSync(__dirname+'/client.js'));
+			pkg.stream.write(fs.readFileSync(__dirname + '/client.js'));
 		}
 		pkg.stream.end();
 	}

@@ -13,9 +13,12 @@ var resolve = function(id) {
 	}
 }
 
-var checkPackage = function(id, dep) {
+var checkPackage = function(id, dep, bef, use) {
 	try {
 		pack = require(path.resolve(id, 'package.json'));
+		if (pack.main == null) {
+			pack.main = './index.js';
+		}
 		if (pack.browser != null) {
 			switch (typeof pack.browser) {
 				case 'string':
@@ -34,6 +37,10 @@ var checkPackage = function(id, dep) {
 					}];
 					break;
 				case 'object':
+					var bro = {};
+					for (var i in pack.browser) {
+						bro[i] = resolve(path.resolve(id, pack.browser[i]));
+					}
 					if (pack.browser[pack.main] != null) {
 						return [{
 							id: resolve(path.resolve(id, pack.main)),
@@ -41,14 +48,14 @@ var checkPackage = function(id, dep) {
 								client: false,
 								node: true
 							},
-							browser: pack.browser
+							browser: bro
 						}, {
 							id: resolve(path.resolve(id, pack.browser[pack.main])),
 							use: {
 								client: true,
 								node: false
 							},
-							browser: pack.browser
+							browser: bro
 						}];
 					} else {
 						return [{
@@ -57,7 +64,7 @@ var checkPackage = function(id, dep) {
 								client: true,
 								node: true
 							},
-							browser: pack.browser
+							browser: bro
 						}];
 					}
 					break;
@@ -70,23 +77,25 @@ var checkPackage = function(id, dep) {
 			return [{
 				id: resolve(path.resolve(id, pack.main)),
 				use: {
-					client: dep.use.client,
-					node: dep.use.client
-				}
+					client: use.client,
+					node: use.node
+				},
+				browser: dep.browser
 			}];
 		}
 	} catch (e) {
 		return [{
 			id: resolve(id),
 			use: {
-				client: dep.use.client,
-				node: dep.use.client
-			}
+				client: use.client,
+				node: use.node
+			},
+			browser: dep.browser
 		}];
 	}
 }
 
-var getDependency = function(dep, file) {
+var getDependency = function(dep, file, use) {
 	var node_module = dep.node_module;
 	var tags = file.split('!');
 	var name = tags.pop();
@@ -96,7 +105,7 @@ var getDependency = function(dep, file) {
 	var id = name,
 		deps = [];
 	if (name[0] === '/' || (name[0] === '.' && (name[1] === '/' || (name[1] === '.' && name[2] === '/')))) {
-		deps = checkPackage(path.resolve(before, id), dep, before);
+		deps = checkPackage(path.resolve(before, id), dep, before, use);
 	} else {
 		node_module = true;
 		var toCheck, basePath = beforeSplitted.join('/');
@@ -104,7 +113,7 @@ var getDependency = function(dep, file) {
 			toCheck = path.resolve(basePath, 'node_modules', id);
 			try {
 				//id = require.resolve(toCheck);
-				deps = checkPackage(toCheck, dep, before);
+				deps = checkPackage(toCheck, dep, before, use);
 				break;
 			} catch (e) {
 				if (beforeSplitted.length > 2) {
@@ -178,14 +187,39 @@ var getDependenciesAndSource = function(dep, transformers, done) {
 		dep.requires = [];
 
 		for (var i in reqs) {
-			var req = reqs[i];
-			if (dep.browser != null && dep.use.client === true && dep.browser[req] != null) {
-				req = dep.browser[req];
-			}
-			var temp_deps = getDependency(dep, req);
-			for (var j in temp_deps) {
-				dep.deps.push(temp_deps[j]);
-				dep.requires.push(reqs[i]);
+			var reqA = reqs[i];
+			if (dep.browser != null && dep.use.client === true && dep.browser[reqA] != null) {
+				var reqB = dep.browser[reqA];
+				console.log('Replaced', reqA, reqB);
+
+				var temp_deps = getDependency(dep, reqB, {
+					client: true,
+					node: false
+				});
+				for (var j in temp_deps) {
+					dep.deps.push(temp_deps[j]);
+					dep.requires.push(reqA);
+				}
+				if (dep.node_module === false) {
+					var temp_deps = getDependency(dep, reqA, {
+						client: false,
+						node: true
+					});
+					for (var j in temp_deps) {
+						dep.deps.push(temp_deps[j]);
+						dep.requires.push(reqA);
+					}
+				}
+			} else {
+				if (dep.node_module === false || dep.use.client === true) {
+					var temp_deps = getDependency(dep, reqA, dep.use);
+					for (var j in temp_deps) {
+						if (temp_deps[j].node_module === false || temp_deps[j].use.client === true) {
+							dep.deps.push(temp_deps[j]);
+							dep.requires.push(reqA);
+						}
+					}
+				}
 			}
 			//console.log(temp_deps);
 		}
