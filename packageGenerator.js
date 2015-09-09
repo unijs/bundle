@@ -61,7 +61,7 @@ var createPackage = function(key, id) {
 	packages[key].replacers = {};
 	packages[key].stream = fs.createOutputStream(path.join(buildpathWeb, 'c' + packages[key].id + '.js'));
 	if (id === 0) {
-		packages[key].stream.write('var deps = {}, process = {env: {}}, global = {};\n');
+		packages[key].stream.write('var deps = {}, process = {env: {}}, global = window;\n');
 	}
 }
 
