@@ -1,6 +1,170 @@
 var cp = require('child_process');
-var fs = require('fs');
 var os = require('os');
+
+var cache = {};
+
+var workers = [];
+var checksRunning = 0;
+var packageCounter = 0;
+var depKeyCounter = 0;
+
+var enableStats = false;
+var enableLocalWorker = false;
+var enableQueue = false;
+var localWorker;
+
+if (enableLocalWorker === true) {
+	localWorker = require('./localWorker.js');
+}
+
+var getHrTime = function() {
+	var hrTime = process.hrtime();
+	return (hrTime[0] * 1000000 + hrTime[1] / 1000) / 1000;
+}
+
+var timers = {
+	start: 0,
+	startExport: 0,
+	workersReady: 0,
+	stop: 0
+}
+
+var setListener = function(i, worker) {
+	worker.on('message', function(m) {
+		switch (m.job) {
+			case "retDependency":
+				worker.jobs--;
+				if (enableStats === true) {
+					worker.stats.workerJobs--;
+					if (worker.jobs === 0) {
+						worker.stats.lastJob = getHrTime() - timers.start;
+					}
+				}
+				if (sources[m.dep.id] == null) {
+					sources[m.dep.id] = m.dep;
+					sources[m.dep.id].key = depKeyCounter;
+					depKeyCounter++;
+				} else {
+					sources[m.dep.id].src = m.dep.src;
+					sources[m.dep.id].deps = m.dep.deps;
+					sources[m.dep.id].requires = m.dep.requires;
+				}
+				checkDependencies(m.dep);
+				break;
+			case "pong":
+				timers.workersReady = getHrTime();
+				worker.maxJobs = m.maxJobs;
+				worker.ready = true;
+				if (loadQueue.length > 0) {
+					cleanUpQueue();
+				}
+				break;
+			default:
+				throw new Error('Unknown message from build child!');
+				break;
+		}
+	});
+	worker.load = function(dep) {
+		if (enableStats === true) {
+			worker.stats.workerJobs++;
+			worker.stats.totalWorkerJobs++;
+			if (worker.stats.workerJobs > worker.stats.maxWorkerJobs) {
+				worker.stats.maxWorkerJobs = worker.stats.workerJobs;
+			}
+		}
+
+		worker.send({
+			job: 'loadDependency',
+			dep: dep
+		});
+	}
+
+	worker.loadCache = function(dep) {
+		worker.jobs++;
+		if (enableStats === true) {
+			worker.stats.totalJobs++;
+			if (worker.jobs > worker.stats.maxJobs) {
+				worker.stats.maxJobs = worker.jobs;
+			}
+		}
+		checksRunning++;
+		if (globalOptions.cache === true) {
+			fs.stat(dep.id, function(err, stats) {
+				if (err) throw err;
+				var mtime = (new Date(stats.mtime)).getTime();
+				dep.mtime = mtime;
+				checksRunning--;
+				if (cache && cache[dep.id] && cache[dep.id].mtime && cache[dep.id].mtime === dep.mtime) {
+					//sources[dep.id] = JSON.parse(JSON.stringify(cache[dep.id]));
+					worker.jobs--;
+
+					if (sources[dep.id] == null) {
+						sources[dep.id] = cache[dep.id];
+						sources[dep.id].key = depKeyCounter;
+						depKeyCounter++;
+					} else {
+						sources[dep.id].src = cache[dep.id].src;
+						sources[dep.id].deps = cache[dep.id].deps;
+						sources[dep.id].requires = cache[dep.id].requires;
+					}
+
+					checkDependencies(cache[dep.id]);
+
+				} else {
+					// Not Cached
+					globalOptions.changed = true;
+					worker.load(dep);
+					deleteBuildPaths();
+				}
+			});
+		} else {
+			globalOptions.changed = true;
+			deleteBuildPaths();
+			worker.load(dep);
+		}
+	}
+
+	worker.send({
+		job: 'setTransformers',
+		transformers: []
+	});
+
+	worker.send({
+		job: 'ping'
+	});
+	// require.resolve('./babelTransformer.js')
+}
+
+var createWorkers = function(cpus) {
+	if (enableLocalWorker === true) {
+		cpus++;
+	}
+	for (var i = 0; i < cpus; i++) {
+		if (i === 0 && enableLocalWorker === true) {
+			var worker = localWorker;
+		} else {
+			var worker = cp.fork(__dirname + '/child.js', [], {
+				silent: false
+			});
+		}
+		worker.jobs = 0;
+		worker.maxJobs = 99999999999;
+		if (enableStats === true) {
+			worker.stats = {
+				maxJobs: 0,
+				totalJobs: 0,
+				lastJob: 0,
+				workerJobs: 0,
+				maxWorkerJobs: 0,
+				totalWorkerJobs: 0
+			}
+		}
+		worker.ready = false;
+		workers[i] = worker;
+		setListener(i, worker);
+	}
+}
+
 var fs = require('fs-extra');
 var path = require('path');
 var colors = require('colors');
@@ -11,14 +175,6 @@ var replSources = {};
 var swappersToLoad = [];
 var dirname = process.cwd();
 
-var cache = {};
-
-//var cache = {};
-
-var workers = [];
-var checksRunning = 0;
-var packageCounter = 0;
-var depKeyCounter = 0;
 
 //var swappers = [];
 /*var swappers = [{
@@ -75,19 +231,39 @@ var isFinished = function() {
 	return true;
 }
 
+var loadQueue = [];
+
+var cleanUpQueue = function() {
+	while (loadQueue.length > 0) {
+		var dep = loadQueue.shift();
+		//console.log('Out of queue', dep.id);
+		loadDependency(dep);
+	}
+}
+
 var loadDependency = function(dep) {
 	var lowNumber = Infinity;
+	var found = false;
+
 	var workerNumber = 0;
 	for (var i in workers) {
-		if (workers[i].jobs < 1) {
-			return workers[i].loadCache(dep);
-		}
-		if (workers[i].jobs < lowNumber) {
-			lowNumber = workers[i].jobs;
-			workerNumber = i;
+		if (workers[i].ready === true || !enableQueue) {
+			if (workers[i].jobs < 1) {
+				return workers[i].loadCache(dep);
+			}
+			if ((workers[i].jobs < workers[i].maxJobs || !enableQueue) && workers[i].jobs < lowNumber) {
+				lowNumber = workers[i].jobs;
+				workerNumber = i;
+				found = true;
+			}
 		}
 	}
-	workers[workerNumber].loadCache(dep);
+	if (found === true) {
+		workers[workerNumber].loadCache(dep);
+	} else {
+		//console.log('queued', dep.id);
+		loadQueue.push(dep);
+	}
 }
 
 var checkDependencies = function(dep) {
@@ -150,16 +326,31 @@ var checkDependencies = function(dep) {
 			};
 		}
 	}
-	if (stillrunning === false && checksRunning < 1 && isFinished()) {
+	if (stillrunning === false && checksRunning < 1 && loadQueue.length === 0 && isFinished()) {
 
-		var ac = getHrTime();
+		timers.startExport = getHrTime();
 
 
 		if (globalOptions.changed === false) {
-			console.log('Nothing changed!');
+			console.log('');
+			console.log('   ||------------------||'.yellow.bold);
+			console.log('   || Nothing changed! ||'.yellow.bold);
+			console.log('   ||------------------||'.yellow.bold);
+			console.log('');
 		}
 
 		var c = 0;
+
+		var checkFin = function(a) {
+			if (a < 1) {
+				timers.stop = getHrTime();
+				console.log(' ✔ ✔ ✔ Bundled successful! ✔ ✔ ✔'.green.bold);
+				console.log(' » Worker startup: ', timers.workersReady - timers.start, 'ms');
+				console.log(' » Compile time:   ', timers.startExport - timers.workersReady, 'ms');
+				console.log(' » Export time:    ', timers.stop - timers.startExport, 'ms');
+				console.log(' » Total time:     '.bold, (timers.stop - timers.start + "").magenta.bold, 'ms'.bold);
+			}
+		}
 
 		for (var i in workers) {
 			c++;
@@ -168,14 +359,8 @@ var checkDependencies = function(dep) {
 				checkFin(c);
 			});
 			workers[i].kill();
-		}
-
-		var checkFin = function(a) {
-			if (a < 1) {
-				var stop = getHrTime();
-				console.log('Bundled successful!'.green.bold);
-				console.log(' > Time until loaded:', ac - start, 'ms');
-				console.log(' > Total time:', stop - start, 'ms');
+			if (enableStats === true) {
+				console.log(i, workers[i].stats);
 			}
 		}
 
@@ -203,114 +388,15 @@ var checkDependencies = function(dep) {
 			}
 
 			if (removeCB === true) {
-				console.log('Sta now');
+				//console.log('Sta now');
 				st();
 			} else {
-				console.log('Sta later');
+				//console.log('Sta later');
 				removeCB = st;
 			}
 		}
 	}
 	return true;
-}
-
-var setListener = function(i, worker) {
-	worker.on('message', function(m) {
-		switch (m.job) {
-			case "retDependency":
-				worker.jobs--;
-				//console.log('HR', getHrTime() - m.dep.chtime);
-				if (worker.jobs === 0) {
-					worker.lastJob = Date.now() - start;
-				}
-				if (sources[m.dep.id] == null) {
-					sources[m.dep.id] = m.dep;
-					sources[m.dep.id].key = depKeyCounter;
-					depKeyCounter++;
-				} else {
-					sources[m.dep.id].src = m.dep.src;
-					sources[m.dep.id].deps = m.dep.deps;
-					sources[m.dep.id].requires = m.dep.requires;
-				}
-				checkDependencies(m.dep);
-				break;
-			default:
-				throw new Error('Unknown message from build child!');
-				break;
-		}
-	});
-	worker.load = function(dep) {
-		worker.jobs++;
-		worker.totalJobs++;
-		if (worker.jobs > worker.maxJobs) {
-			worker.maxJobs = worker.jobs;
-		}
-
-		//dep.chTime = getHrTime();
-		//console.log(dep);
-		worker.send({
-			job: 'loadDependency',
-			dep: dep
-		});
-	}
-
-	worker.loadCache = function(dep) {
-		checksRunning++;
-		if (globalOptions.cache === true) {
-			fs.stat(dep.id, function(err, stats) {
-				if (err) throw err;
-				var mtime = (new Date(stats.mtime)).getTime();
-				dep.mtime = mtime;
-				checksRunning--;
-				if (cache && cache[dep.id] && cache[dep.id].mtime && cache[dep.id].mtime === dep.mtime) {
-					//sources[dep.id] = JSON.parse(JSON.stringify(cache[dep.id]));
-
-					if (sources[dep.id] == null) {
-						sources[dep.id] = cache[dep.id];
-						sources[dep.id].key = depKeyCounter;
-						depKeyCounter++;
-					} else {
-						sources[dep.id].src = cache[dep.id].src;
-						sources[dep.id].deps = cache[dep.id].deps;
-						sources[dep.id].requires = cache[dep.id].requires;
-					}
-
-					checkDependencies(cache[dep.id]);
-
-				} else {
-					// Not Cached
-					globalOptions.changed = true;
-					worker.load(dep);
-					deleteBuildPaths();
-				}
-			});
-		} else {
-			globalOptions.changed = true;
-			deleteBuildPaths();
-			worker.load(dep);
-		}
-	}
-
-	worker.send({
-		job: 'setTransformers',
-		transformers: []
-	});
-	// require.resolve('./babelTransformer.js')
-}
-
-var createWorkers = function() {
-	var cpus = os.cpus().length / 2;
-	for (var i = 0; i < cpus; i++) {
-		var worker = cp.fork(__dirname + '/child.js', [], {
-			silent: false
-		});
-		worker.jobs = 0;
-		worker.totalJobs = 0;
-		worker.maxJobs = 0;
-		worker.lastJob = 0;
-		workers[i] = worker;
-		setListener(i, worker);
-	}
 }
 
 var removeCB = null;
@@ -326,35 +412,43 @@ var deleteBuildPaths = function() {
 		}
 	}
 	var c = 2;
-	fs.remove(globalOptions.buildpathWeb, function(err) {
+	fs.ensureDir(globalOptions.buildpath, function(err) {
 		if (err) throw err;
-		c--;
-		cb(c);
+		fs.remove(globalOptions.buildpathWeb, function(err) {
+			if (err) throw err;
+			c--;
+			cb(c);
+		});
+		fs.remove(globalOptions.buildpathNode, function(err) {
+			if (err) throw err;
+			c--;
+			cb(c);
+		});
 	});
-	fs.remove(globalOptions.buildpathNode, function(err) {
-		if (err) throw err;
-		c--;
-		cb(c);
-	});
+
 }
 
-var start;
 var globalOptions = {};
-createWorkers();
 
 var run = function(options) {
-
-	start = getHrTime();
+	timers.start = getHrTime();
 
 	if (options == null || typeof options !== 'object' || options.entryFile == null || typeof options.entryFile !== 'string') {
 		throw new Error('Options parameter needs to be an object and include the property entryFile!');
 	}
+
+	options.cpus = options.cpus || os.cpus().length / 2;
+	options.cpus = Math.round(options.cpus);
+	if (options.cpus < 1) {
+		options.cpus = 1;
+	}
+
+	createWorkers(options.cpus);
+
 	options.buildpath = options.buildpath ||  path.join(dirname, 'build');
 
 	options.buildpathWeb = path.join(options.buildpath, 'web');
 	options.buildpathNode = path.join(options.buildpath, 'node');
-
-	//options.cpus = options.cpus || os.cpus().length / 2;
 	options.swappers = options.swappers || [];
 	options.transformers = options.transformers || [];
 	options.cacheFile = options.cacheFile || path.join(options.buildpath, 'cache.json');
@@ -369,7 +463,8 @@ var run = function(options) {
 
 	globalOptions = options;
 
-	for(var i in workers){
+	for (var i in workers) {
+		timers.workersReady = getHrTime();
 		workers[i].send({
 			job: 'setTransformers',
 			transformers: globalOptions.transformers
@@ -398,9 +493,5 @@ var run = function(options) {
 	});
 }
 
-var getHrTime = function() {
-	var hrTime = process.hrtime();
-	return (hrTime[0] * 1000000 + hrTime[1] / 1000) / 1000;
-}
 
 module.exports = run;

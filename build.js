@@ -9,3 +9,13 @@ unijsBundle({
 	}],
 	transformers: [require.resolve('./babelTransformer.js')]
 });
+
+
+/*unijsBundle({
+	entryFile: require.resolve(path.join(__dirname, 'soi.js'))
+	/*swappers: [{
+		tags: ['split'],
+		module: require.resolve('./test/replacement.js')
+	}],
+	transformers: [require.resolve('./babelTransformer.js')]*
+});*/

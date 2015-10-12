@@ -18,6 +18,12 @@ process.on('message', function(m) {
 			});
 		});
 	}
+	if (m.job === 'ping') {
+		process.send({
+			job: 'pong',
+			maxJobs: 99999999999
+		});
+	}
 });
 
 var getHrTime = function() {

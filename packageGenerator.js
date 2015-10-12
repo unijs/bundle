@@ -17,6 +17,8 @@ var writeDependencyToStream = function(pkg, dep) {
 	} else {
 		pkg.stream.write('deps[' + dep.key + '] = [function(require, module, exports) {\n');
 	}
+	//console.log(dep);
+	//console.log(typeof dep.src, dep.src.length);
 	pkg.stream.write(dep.src);
 	pkg.stream.write('\n');
 	var r = {};
@@ -111,7 +113,7 @@ var generate = function(srcs, pkgCount, options, callback) {
 	for (var i in sources) {
 		var dep = sources[i];
 
-		console.log(dep.use, dep.id);
+		//console.log(dep.use, dep.id);
 
 		if (dep.swap !== false) {
 			swapMap[dep.key] = dep.swap;

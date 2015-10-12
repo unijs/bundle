@@ -24,10 +24,6 @@ var _react = require('react');
 
 var _react2 = _interopRequireDefault(_react);
 
-var _http = require('http');
-
-var _http2 = _interopRequireDefault(_http);
-
 var Home = (function (_React$Component) {
 	_inherits(Home, _React$Component);
 
@@ -43,7 +39,7 @@ var Home = (function (_React$Component) {
 			return _react2['default'].createElement(
 				'div',
 				{ style: { textAlign: 'center', fontFamily: 'Helvetica, Arial' } },
-				'My sweet home Page! LA!HULISTkKKdddskkjlhjhooddd'
+				'My sweet home Page! LA! GEHT! JETZT! NET!SddSsxuxAlK'
 			);
 		}
 	}]);
