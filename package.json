@@ -1,6 +1,6 @@
 {
   "name": "unijs-bundle",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Bundle System especially for ReactJS Apps",
   "main": "index.js",
   "files": [
@@ -11,6 +11,7 @@
     "client.js",
     "index.js",
     "loader.js",
+    "localWorker.js",
     "nodeExport.js",
     "packageGenerator.js",
     "parent.js",
