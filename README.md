@@ -1,3 +1,5 @@
+# This repo is no longer maintained! Use webpack!
+
 # bundle
 Bundle System especially for ReactJS Apps.
 
